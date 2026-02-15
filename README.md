@@ -2,6 +2,8 @@
 
 CycleSmith is a reusable planner-worker-judge development loop toolkit.
 
+Read first: `START_HERE.md`.
+
 ## What it Provides
 
 - deterministic cycle runner (`run`, `init-goal`)
@@ -25,6 +27,14 @@ cyclesmith runner -- run --goal reports/dev_loop/goal.json --max-actions 2
 cyclesmith validate -- --cycle-dir reports/dev_loop/example_cycle --validate-schema
 cyclesmith memory -- --memory reports/dev_loop/memory_snapshot.json validate
 ```
+
+## Planning Docs
+
+- `START_HERE.md`
+- `tickets.md`
+- `docs/roadmap.md`
+- `docs/plans/phase2_plan.md`
+- `docs/migration/streamsafe_context.md`
 
 ## Quality Checks
 
