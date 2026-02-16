@@ -123,6 +123,13 @@
         "minLength": 1
       }
     },
+    "operator_feedback_refs": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "minLength": 1
+      }
+    },
     "next_role": {
       "const": "WORKER"
     }

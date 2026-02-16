@@ -8,9 +8,13 @@
 ## Start Or Continue Work
 
 1. Ensure `tickets.md` has exactly one `IN_PROGRESS` ticket.
-2. `cyclesmith runner -- run --goal reports/dev_loop/goal.json --max-actions 1`
-3. Fill planner/worker/judge artifacts for the active cycle directory.
-4. `cyclesmith runner -- run --goal reports/dev_loop/goal.json --max-actions 1`
+2. Start/finalize loop:
+   - `cyclesmith runner -- run --goal reports/dev_loop/goal.json --max-actions 1`
+3. Execute roles:
+   - Manual mode: fill planner/worker/judge artifacts for the active cycle directory.
+   - Command mode: configure `goal.json.role_commands` (or pass `--planner-command/--worker-command/--judge-command`) and run with enough actions to complete the sequence.
+4. Re-run loop:
+   - `cyclesmith runner -- run --goal reports/dev_loop/goal.json --max-actions 1`
 
 ## Before Commit
 
@@ -20,4 +24,3 @@
 4. `uv run ruff check .`
 5. `uv run ty check .`
 6. `uv run pytest -q`
-

@@ -4,6 +4,7 @@ import json
 from pathlib import Path
 from typing import Any
 
+from cyclesmith.dev_loop.ticket_backends import TicketBackendKind
 from cyclesmith.dev_loop.workflow_compliance import run_compliance_checks
 from tests.utils import runtime_dir
 
@@ -183,6 +184,7 @@ def _run(
         repo_root=repo_root,
         changed_paths=changed_paths,
         tickets_path=repo_root / "tickets.md",
+        tickets_backend_kind=TicketBackendKind.MARKDOWN,
         cycles_root=repo_root / "reports" / "dev_loop",
         memory_path=repo_root / "reports" / "dev_loop" / "memory_snapshot.json",
         schema_dir=Path(__file__).resolve().parents[1] / "schemas" / "dev_loop",

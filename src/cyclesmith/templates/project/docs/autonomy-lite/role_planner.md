@@ -53,6 +53,7 @@ The Planner is responsible for converting exactly one active ticket into a const
   ],
   "risks": ["string"],
   "handoff_constraints": ["string"],
+  "operator_feedback_refs": ["string"],
   "next_role": "WORKER"
 }
 ```
@@ -62,5 +63,6 @@ The Planner is responsible for converting exactly one active ticket into a const
 - `steps` entries must be actionable and file-specific.
 - `scope_out` must list at least one explicit non-goal.
 - `handoff_constraints` must include forbidden actions when relevant.
+- If operator feedback applies, `operator_feedback_refs` must include the
+  pending feedback id.
 - `next_role` must be exactly `WORKER`.
-

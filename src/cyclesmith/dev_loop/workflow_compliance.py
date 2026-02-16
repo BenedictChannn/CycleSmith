@@ -9,6 +9,7 @@ import subprocess
 from pathlib import Path, PurePosixPath
 
 from cyclesmith.dev_loop import memory_snapshot, validate_cycle_artifacts
+from cyclesmith.dev_loop.ticket_backends import TicketBackendKind
 
 MAINTENANCE_ALLOWED_PREFIXES = ("reports/",)
 MAINTENANCE_ALLOWED_EXACT = {"Cargo.lock", "uv.lock"}
@@ -111,6 +112,7 @@ def _validate_runner_state_file(state_path: Path, cycles_root_path: Path) -> lis
 def _run_cycle_validator(
     cycle_dir: Path,
     tickets_path: Path,
+    tickets_backend_kind: TicketBackendKind,
     schema_dir: Path,
 ) -> str | None:
     validator_rc = validate_cycle_artifacts.main(
@@ -119,6 +121,8 @@ def _run_cycle_validator(
             str(cycle_dir),
             "--tickets",
             str(tickets_path),
+            "--tickets-backend",
+            tickets_backend_kind.value,
             "--validate-schema",
             "--schema-dir",
             str(schema_dir),
@@ -201,6 +205,7 @@ def run_compliance_checks(
     repo_root: Path,
     changed_paths: list[str],
     tickets_path: Path,
+    tickets_backend_kind: TicketBackendKind,
     cycles_root: Path,
     memory_path: Path,
     schema_dir: Path,
@@ -249,6 +254,7 @@ def run_compliance_checks(
         validator_error = _run_cycle_validator(
             cycle_dir=cycle_dir,
             tickets_path=tickets_path,
+            tickets_backend_kind=tickets_backend_kind,
             schema_dir=schema_dir,
         )
         if validator_error is not None:
@@ -297,7 +303,14 @@ def build_parser() -> argparse.ArgumentParser:
         "--tickets",
         type=Path,
         default=Path("tickets.md"),
-        help="Path to tickets markdown file.",
+        help="Path to tickets file.",
+    )
+    parser.add_argument(
+        "--tickets-backend",
+        type=str,
+        default=TicketBackendKind.MARKDOWN.value,
+        choices=[kind.value for kind in TicketBackendKind],
+        help="Ticket backend type.",
     )
     parser.add_argument(
         "--cycles-root",
@@ -351,6 +364,7 @@ def main(argv: list[str] | None = None) -> int:
 
     repo_root = args.repo_root.resolve()
     tickets_path = (repo_root / args.tickets).resolve()
+    tickets_backend_kind = TicketBackendKind(args.tickets_backend)
     cycles_root = (repo_root / args.cycles_root).resolve()
     memory_path = (repo_root / args.memory).resolve()
     schema_dir = (repo_root / args.schema_dir).resolve()
@@ -372,6 +386,7 @@ def main(argv: list[str] | None = None) -> int:
         repo_root=repo_root,
         changed_paths=changed_paths,
         tickets_path=tickets_path,
+        tickets_backend_kind=tickets_backend_kind,
         cycles_root=cycles_root,
         memory_path=memory_path,
         schema_dir=schema_dir,

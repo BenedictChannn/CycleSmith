@@ -8,28 +8,12 @@ from enum import StrEnum
 from pathlib import Path
 from typing import Any
 
-
-class TaskType(StrEnum):
-    FEATURE = "FEATURE"
-    IMPROVEMENT = "IMPROVEMENT"
-    BUG = "BUG"
-    CHORE = "CHORE"
-    INVESTIGATION = "INVESTIGATION"
-    REFACTOR = "REFACTOR"
-    DOCS = "DOCS"
-    PERFORMANCE = "PERFORMANCE"
-    SECURITY = "SECURITY"
-    TEST = "TEST"
-
-
-class TicketStatus(StrEnum):
-    TODO = "TODO"
-    IN_PROGRESS = "IN_PROGRESS"
-    WIP = "WIP"
-    BLOCKED = "BLOCKED"
-    REVIEW = "REVIEW"
-    COMPLETED = "COMPLETED"
-    CANCELLED = "CANCELLED"
+from cyclesmith.dev_loop.ticket_backends import (
+    TaskType,
+    TicketBackendKind,
+    TicketStatus,
+    resolve_ticket_backend,
+)
 
 
 class WorkerStepStatus(StrEnum):
@@ -348,26 +332,12 @@ def _validate_schemas(
     )
 
 
-def _parse_tickets(markdown_text: str) -> dict[str, TicketStatus]:
+def _parse_tickets(path: Path, backend_kind: TicketBackendKind) -> dict[str, TicketStatus]:
+    backend = resolve_ticket_backend(backend_kind)
+    tickets = backend.load(path)
     status_by_title: dict[str, TicketStatus] = {}
-    for raw_line in markdown_text.splitlines():
-        line = raw_line.strip()
-        if not line.startswith("|"):
-            continue
-        cells = [cell.strip() for cell in line.split("|")[1:-1]]
-        if len(cells) != 4:
-            continue
-        if cells[0] == "Task Type":
-            continue
-        if all(set(cell) <= {"-"} for cell in cells):
-            continue
-        title = cells[1]
-        status_text = cells[3]
-        try:
-            status = TicketStatus(status_text)
-        except ValueError:
-            continue
-        status_by_title[title] = status
+    for row in tickets.rows:
+        status_by_title[row.task] = row.status
     return status_by_title
 
 
@@ -756,7 +726,14 @@ def build_parser() -> argparse.ArgumentParser:
         "--tickets",
         type=Path,
         default=Path("tickets.md"),
-        help="Path to tickets.md used for ticket-title validation.",
+        help="Path to tickets file used for ticket-title validation.",
+    )
+    parser.add_argument(
+        "--tickets-backend",
+        type=str,
+        default=TicketBackendKind.MARKDOWN.value,
+        choices=[kind.value for kind in TicketBackendKind],
+        help="Ticket backend type.",
     )
     parser.add_argument(
         "--validate-schema",
@@ -797,7 +774,14 @@ def main(argv: list[str] | None = None) -> int:
             print(f"[dev-loop] ERROR: {error}")
         return 1
 
-    ticket_status_by_title = _parse_tickets(args.tickets.read_text(encoding="utf-8"))
+    ticket_backend_kind = TicketBackendKind(args.tickets_backend)
+    try:
+        ticket_status_by_title = _parse_tickets(args.tickets, ticket_backend_kind)
+    except (ValueError, json.JSONDecodeError) as exc:
+        errors.append(f"Failed to parse tickets: {exc}")
+        for error in errors:
+            print(f"[dev-loop] ERROR: {error}")
+        return 1
 
     planner_raw = _read_json_object(args.cycle_dir / "planner.json", errors)
     worker_raw = _read_json_object(args.cycle_dir / "worker.json", errors)

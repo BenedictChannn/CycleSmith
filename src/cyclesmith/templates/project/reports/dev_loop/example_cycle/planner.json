@@ -60,5 +60,6 @@
     "Do not edit files outside planner scope without ticket updates.",
     "Do not mark cycle pass if required checks are missing."
   ],
+  "operator_feedback_refs": [],
   "next_role": "WORKER"
 }

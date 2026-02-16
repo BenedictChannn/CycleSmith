@@ -65,5 +65,8 @@
     "Do not use getattr/setattr/hasattr.",
     "Keep cycle IDs runner-compatible and immutable after commit."
   ],
+  "operator_feedback_refs": [
+    "OFB-20260216-01"
+  ],
   "next_role": "WORKER"
 }

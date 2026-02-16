@@ -35,5 +35,6 @@
   "handoff_constraints": [
     "Do not mark pass when required checks are missing."
   ],
+  "operator_feedback_refs": [],
   "next_role": "WORKER"
 }

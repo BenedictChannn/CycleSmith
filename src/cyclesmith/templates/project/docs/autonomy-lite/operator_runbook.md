@@ -12,6 +12,7 @@ This runbook is the required operating procedure for Planner -> Worker -> Judge 
    - `START_HERE.md`
    - `docs/dev_loop.md`
    - `docs/autonomy-lite/artifact_contract.md`
+   - `docs/autonomy-lite/operator_feedback_contract.md`
 
 ## 2) Cycle Setup
 
@@ -34,9 +35,30 @@ cyclesmith runner -- run --goal reports/dev_loop/goal.json --max-actions 2
 
 Runner behavior:
 
-1. If an active cycle already has `planner.json`, `worker.json`, and `judge.json`, it finalizes the cycle (validator, ticket transition, follow-up tickets, memory sync).
-2. If no active cycle exists, it selects ticket by policy (`IN_PROGRESS` first, else top-most `TODO`) and scaffolds the next cycle.
-3. It writes `reports/dev_loop/runner_state.json` and per-cycle `runner_sync.json` for traceability.
+1. If no active cycle exists, it selects ticket by policy (`IN_PROGRESS` first, else top-most `TODO`) and scaffolds the next cycle.
+2. If role artifacts are missing, manual mode waits for files while command mode can execute configured role commands in-order (`planner`, `worker`, `judge`).
+3. If an active cycle has `planner.json`, `worker.json`, and `judge.json`, it finalizes the cycle (validator, ticket transition, follow-up tickets, memory sync).
+4. It writes `reports/dev_loop/runner_state.json` and per-cycle `runner_sync.json` for traceability.
+5. If optional `reports/dev_loop/operator_feedback.json` applies, runner requires
+   planner acknowledgement via `operator_feedback_refs` before finalization.
+
+Command mode can be configured with:
+
+```json
+{
+  "role_commands": {
+    "planner": ["python", "scripts/role_driver.py"],
+    "worker": ["python", "scripts/role_driver.py"],
+    "judge": ["python", "scripts/role_driver.py"]
+  }
+}
+```
+
+Or with CLI overrides:
+
+```bash
+cyclesmith runner -- run --goal reports/dev_loop/goal.json --planner-command python scripts/role_driver.py --worker-command python scripts/role_driver.py --judge-command python scripts/role_driver.py --max-actions 5
+```
 
 Goal file initialization:
 

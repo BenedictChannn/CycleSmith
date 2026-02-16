@@ -36,6 +36,8 @@ cyclesmith validate -- --cycle-dir reports/dev_loop/<cycle_id> --validate-schema
    - `pass -> REVIEW`
    - `rework -> IN_PROGRESS`
    - `blocked -> BLOCKED`
+6. When operator feedback is pending for a cycle, planner must include matching
+   ids in `planner.operator_feedback_refs`.
 
 ## Ticket Invariants
 

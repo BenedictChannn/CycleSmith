@@ -6,6 +6,7 @@ Planner/Worker/Judge roles. It handles:
 - Goal loading (`reports/dev_loop/goal.json`)
 - Deterministic ticket selection (`IN_PROGRESS` first, then top-most `TODO`)
 - Cycle scaffolding (`reports/dev_loop/<cycle_id>/cycle_context.json`)
+- Optional command-driven planner/worker/judge role execution
 - Judge-driven ticket transitions + follow-up ticket insertion
 - Memory ingest/validate + profile-based prune cadence
 """
@@ -14,6 +15,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import re
 import subprocess
 import sys
@@ -23,28 +25,16 @@ from enum import StrEnum
 from pathlib import Path
 from typing import Any
 
-
-class TaskType(StrEnum):
-    FEATURE = "FEATURE"
-    IMPROVEMENT = "IMPROVEMENT"
-    BUG = "BUG"
-    CHORE = "CHORE"
-    INVESTIGATION = "INVESTIGATION"
-    REFACTOR = "REFACTOR"
-    DOCS = "DOCS"
-    PERFORMANCE = "PERFORMANCE"
-    SECURITY = "SECURITY"
-    TEST = "TEST"
-
-
-class TicketStatus(StrEnum):
-    TODO = "TODO"
-    IN_PROGRESS = "IN_PROGRESS"
-    WIP = "WIP"
-    BLOCKED = "BLOCKED"
-    REVIEW = "REVIEW"
-    COMPLETED = "COMPLETED"
-    CANCELLED = "CANCELLED"
+from cyclesmith.dev_loop.ticket_backends import (
+    TRANSITION_RULES,
+    TaskType,
+    TicketBackend,
+    TicketBackendKind,
+    TicketRow,
+    TicketsDocument,
+    TicketStatus,
+    resolve_ticket_backend,
+)
 
 
 class GoalCompletionMode(StrEnum):
@@ -52,78 +42,105 @@ class GoalCompletionMode(StrEnum):
     NO_OPEN_TICKETS = "no_open_tickets"
 
 
-class PruneProfile(StrEnum):
+class PolicyPack(StrEnum):
     FAST_LOCAL = "fast-local"
     SHARED_BRANCH = "shared-branch"
     CI_MAIN = "ci-main"
 
 
-TRANSITION_RULES: dict[TicketStatus, set[TicketStatus]] = {
-    TicketStatus.TODO: {
-        TicketStatus.IN_PROGRESS,
-        TicketStatus.WIP,
-        TicketStatus.BLOCKED,
-        TicketStatus.CANCELLED,
-    },
-    TicketStatus.IN_PROGRESS: {
-        TicketStatus.TODO,
-        TicketStatus.BLOCKED,
-        TicketStatus.REVIEW,
-        TicketStatus.COMPLETED,
-        TicketStatus.CANCELLED,
-    },
-    TicketStatus.WIP: {
-        TicketStatus.TODO,
-        TicketStatus.BLOCKED,
-        TicketStatus.REVIEW,
-        TicketStatus.COMPLETED,
-        TicketStatus.CANCELLED,
-    },
-    TicketStatus.BLOCKED: {
-        TicketStatus.TODO,
-        TicketStatus.IN_PROGRESS,
-        TicketStatus.WIP,
-        TicketStatus.CANCELLED,
-    },
-    TicketStatus.REVIEW: {
-        TicketStatus.IN_PROGRESS,
-        TicketStatus.WIP,
-        TicketStatus.COMPLETED,
-        TicketStatus.CANCELLED,
-    },
-    TicketStatus.COMPLETED: set(),
-    TicketStatus.CANCELLED: set(),
-}
+class SelectionPolicy(StrEnum):
+    IN_PROGRESS_THEN_TODO = "in_progress_then_todo"
+    TODO_THEN_IN_PROGRESS = "todo_then_in_progress"
 
 
-PRUNE_POLICY: dict[PruneProfile, tuple[int, int, bool, bool]] = {
-    # (cadence_cycles, max_cycle_lag, stale_unknown, dry_run)
-    PruneProfile.FAST_LOCAL: (5, 8, False, True),
-    PruneProfile.SHARED_BRANCH: (2, 5, True, False),
-    PruneProfile.CI_MAIN: (1, 3, True, False),
+class RoleName(StrEnum):
+    PLANNER = "planner"
+    WORKER = "worker"
+    JUDGE = "judge"
+
+
+@dataclass(frozen=True)
+class RoleCommands:
+    planner: tuple[str, ...] | None
+    worker: tuple[str, ...] | None
+    judge: tuple[str, ...] | None
+
+    def for_role(self, role: RoleName) -> tuple[str, ...] | None:
+        if role == RoleName.PLANNER:
+            return self.planner
+        if role == RoleName.WORKER:
+            return self.worker
+        if role == RoleName.JUDGE:
+            return self.judge
+        raise ValueError(f"Unsupported role: {role.value}")
+
+    def configured_roles(self) -> list[str]:
+        configured: list[str] = []
+        if self.planner is not None:
+            configured.append(RoleName.PLANNER.value)
+        if self.worker is not None:
+            configured.append(RoleName.WORKER.value)
+        if self.judge is not None:
+            configured.append(RoleName.JUDGE.value)
+        return configured
+
+    def mode(self) -> str:
+        if self.planner is None and self.worker is None and self.judge is None:
+            return "manual"
+        return "command"
+
+
+ROLE_SEQUENCE: tuple[tuple[RoleName, str], ...] = (
+    (RoleName.PLANNER, "planner.json"),
+    (RoleName.WORKER, "worker.json"),
+    (RoleName.JUDGE, "judge.json"),
+)
+
+
+@dataclass(frozen=True)
+class PolicyPackConfig:
+    selection_policy: SelectionPolicy
+    prune_cadence_cycles: int
+    prune_max_cycle_lag: int
+    prune_stale_unknown: bool
+    prune_dry_run: bool
+    min_follow_up_tickets: int
+
+
+POLICY_PACKS: dict[PolicyPack, PolicyPackConfig] = {
+    PolicyPack.FAST_LOCAL: PolicyPackConfig(
+        selection_policy=SelectionPolicy.TODO_THEN_IN_PROGRESS,
+        prune_cadence_cycles=5,
+        prune_max_cycle_lag=8,
+        prune_stale_unknown=False,
+        prune_dry_run=True,
+        min_follow_up_tickets=1,
+    ),
+    PolicyPack.SHARED_BRANCH: PolicyPackConfig(
+        selection_policy=SelectionPolicy.IN_PROGRESS_THEN_TODO,
+        prune_cadence_cycles=2,
+        prune_max_cycle_lag=5,
+        prune_stale_unknown=True,
+        prune_dry_run=False,
+        min_follow_up_tickets=1,
+    ),
+    PolicyPack.CI_MAIN: PolicyPackConfig(
+        selection_policy=SelectionPolicy.IN_PROGRESS_THEN_TODO,
+        prune_cadence_cycles=1,
+        prune_max_cycle_lag=3,
+        prune_stale_unknown=True,
+        prune_dry_run=False,
+        min_follow_up_tickets=1,
+    ),
 }
 
 
 @dataclass(frozen=True)
-class TicketRow:
-    task_type: TaskType
-    task: str
-    description: str
-    status: TicketStatus
-
-    def to_markdown_row(self) -> str:
-        return (
-            f"| {self.task_type.value} | {self.task} | {self.description} | {self.status.value} |"
-        )
-
-
-@dataclass(frozen=True)
-class TicketsDocument:
-    prefix_lines: list[str]
-    header_line: str
-    separator_line: str
-    rows: list[TicketRow]
-    suffix_lines: list[str]
+class OperatorFeedback:
+    feedback_id: str
+    target_ticket: str
+    summary: str
+    required_planner_action: str
 
 
 @dataclass(frozen=True)
@@ -134,8 +151,9 @@ class GoalConfig:
     completion_mode: GoalCompletionMode
     target_tickets: list[str]
     max_cycles: int
-    prune_profile: PruneProfile
+    policy_pack: PolicyPack
     stop_conditions: list[str]
+    role_commands: RoleCommands
 
 
 @dataclass(frozen=True)
@@ -144,6 +162,8 @@ class RunnerState:
     goal_id: str
     current_cycle_id: str | None
     current_ticket: str | None
+    pending_feedback_id: str | None
+    last_consumed_feedback_id: str | None
     cycles_started: int
     cycles_finalized: int
     history: list[dict[str, str]]
@@ -154,6 +174,8 @@ class RunnerState:
             "goal_id": self.goal_id,
             "current_cycle_id": self.current_cycle_id,
             "current_ticket": self.current_ticket,
+            "pending_feedback_id": self.pending_feedback_id,
+            "last_consumed_feedback_id": self.last_consumed_feedback_id,
             "cycles_started": self.cycles_started,
             "cycles_finalized": self.cycles_finalized,
             "history": self.history,
@@ -199,6 +221,78 @@ def _read_json_object(path: Path, *, context: str) -> dict[str, Any]:
     return raw
 
 
+def _normalize_command_tokens(tokens: list[Any], *, context: str) -> tuple[str, ...]:
+    if not tokens:
+        raise ValueError(f"{context} must be a non-empty list of command tokens.")
+    normalized: list[str] = []
+    for index, token in enumerate(tokens):
+        if not isinstance(token, str) or not token.strip():
+            raise ValueError(f"{context}[{index}] must be a non-empty string.")
+        normalized.append(token)
+    return tuple(normalized)
+
+
+def _parse_role_commands(raw: Any) -> RoleCommands:
+    if raw is None:
+        return RoleCommands(planner=None, worker=None, judge=None)
+    if not isinstance(raw, dict):
+        raise ValueError("goal.role_commands must be an object when provided.")
+
+    allowed_keys = {RoleName.PLANNER.value, RoleName.WORKER.value, RoleName.JUDGE.value}
+    for key in raw:
+        if key not in allowed_keys:
+            raise ValueError(f"goal.role_commands contains unsupported key: {key}")
+
+    planner: tuple[str, ...] | None = None
+    worker: tuple[str, ...] | None = None
+    judge: tuple[str, ...] | None = None
+
+    planner_value = raw.get(RoleName.PLANNER.value)
+    if planner_value is not None:
+        if not isinstance(planner_value, list):
+            raise ValueError("goal.role_commands.planner must be a list of command tokens.")
+        planner = _normalize_command_tokens(planner_value, context="goal.role_commands.planner")
+
+    worker_value = raw.get(RoleName.WORKER.value)
+    if worker_value is not None:
+        if not isinstance(worker_value, list):
+            raise ValueError("goal.role_commands.worker must be a list of command tokens.")
+        worker = _normalize_command_tokens(worker_value, context="goal.role_commands.worker")
+
+    judge_value = raw.get(RoleName.JUDGE.value)
+    if judge_value is not None:
+        if not isinstance(judge_value, list):
+            raise ValueError("goal.role_commands.judge must be a list of command tokens.")
+        judge = _normalize_command_tokens(judge_value, context="goal.role_commands.judge")
+
+    return RoleCommands(planner=planner, worker=worker, judge=judge)
+
+
+def _resolve_role_commands(
+    *,
+    goal_role_commands: RoleCommands,
+    planner_override: list[str] | None,
+    worker_override: list[str] | None,
+    judge_override: list[str] | None,
+) -> RoleCommands:
+    planner = (
+        _normalize_command_tokens(planner_override, context="--planner-command")
+        if planner_override is not None
+        else goal_role_commands.planner
+    )
+    worker = (
+        _normalize_command_tokens(worker_override, context="--worker-command")
+        if worker_override is not None
+        else goal_role_commands.worker
+    )
+    judge = (
+        _normalize_command_tokens(judge_override, context="--judge-command")
+        if judge_override is not None
+        else goal_role_commands.judge
+    )
+    return RoleCommands(planner=planner, worker=worker, judge=judge)
+
+
 def _parse_goal(path: Path) -> GoalConfig:
     raw = _read_json_object(path, context="goal")
     version = _expect_int(raw, "version", "goal")
@@ -211,18 +305,25 @@ def _parse_goal(path: Path) -> GoalConfig:
     max_cycles = _expect_int(raw, "max_cycles", "goal")
     if max_cycles <= 0:
         raise ValueError("goal.max_cycles must be > 0")
-    prune_profile_text = _expect_string(raw, "prune_profile", "goal")
+
+    policy_pack_value = raw.get("policy_pack")
+    if isinstance(policy_pack_value, str) and policy_pack_value.strip():
+        policy_pack_text = policy_pack_value
+    else:
+        policy_pack_text = _expect_string(raw, "prune_profile", "goal")
+
     target_tickets = _expect_string_list(raw, "target_tickets", "goal")
     stop_conditions = _expect_string_list(raw, "stop_conditions", "goal")
+    role_commands = _parse_role_commands(raw.get("role_commands"))
 
     try:
         completion_mode = GoalCompletionMode(completion_mode_text)
     except ValueError as exc:
         raise ValueError(f"goal.completion_mode unsupported value: {completion_mode_text}") from exc
     try:
-        prune_profile = PruneProfile(prune_profile_text)
+        policy_pack = PolicyPack(policy_pack_text)
     except ValueError as exc:
-        raise ValueError(f"goal.prune_profile unsupported value: {prune_profile_text}") from exc
+        raise ValueError(f"goal.policy_pack unsupported value: {policy_pack_text}") from exc
 
     if completion_mode == GoalCompletionMode.TARGET_TICKETS_CLOSED and not target_tickets:
         raise ValueError("goal.target_tickets must be non-empty for target_tickets_closed mode.")
@@ -234,8 +335,9 @@ def _parse_goal(path: Path) -> GoalConfig:
         completion_mode=completion_mode,
         target_tickets=target_tickets,
         max_cycles=max_cycles,
-        prune_profile=prune_profile,
+        policy_pack=policy_pack,
         stop_conditions=stop_conditions,
+        role_commands=role_commands,
     )
 
 
@@ -245,6 +347,8 @@ def _default_state(goal_id: str) -> RunnerState:
         goal_id=goal_id,
         current_cycle_id=None,
         current_ticket=None,
+        pending_feedback_id=None,
+        last_consumed_feedback_id=None,
         cycles_started=0,
         cycles_finalized=0,
         history=[],
@@ -265,6 +369,9 @@ def _load_state(path: Path, goal_id: str) -> RunnerState:
 
     current_cycle_id_value = raw.get("current_cycle_id")
     current_ticket_value = raw.get("current_ticket")
+    pending_feedback_id_value = raw.get("pending_feedback_id")
+    last_consumed_feedback_id_value = raw.get("last_consumed_feedback_id")
+
     if current_cycle_id_value is None:
         current_cycle_id: str | None = None
     elif isinstance(current_cycle_id_value, str) and current_cycle_id_value.strip():
@@ -283,6 +390,25 @@ def _load_state(path: Path, goal_id: str) -> RunnerState:
         raise ValueError(
             "state.current_cycle_id and state.current_ticket must be both null or both set."
         )
+
+    if pending_feedback_id_value is None:
+        pending_feedback_id: str | None = None
+    elif isinstance(pending_feedback_id_value, str) and pending_feedback_id_value.strip():
+        pending_feedback_id = pending_feedback_id_value
+    else:
+        raise ValueError("state.pending_feedback_id must be null or non-empty string.")
+
+    if last_consumed_feedback_id_value is None:
+        last_consumed_feedback_id: str | None = None
+    elif (
+        isinstance(last_consumed_feedback_id_value, str) and last_consumed_feedback_id_value.strip()
+    ):
+        last_consumed_feedback_id = last_consumed_feedback_id_value
+    else:
+        raise ValueError("state.last_consumed_feedback_id must be null or non-empty string.")
+
+    if current_cycle_id is None and pending_feedback_id is not None:
+        raise ValueError("state.pending_feedback_id cannot be set when no active cycle exists.")
 
     cycles_started = _expect_int(raw, "cycles_started", "state")
     cycles_finalized = _expect_int(raw, "cycles_finalized", "state")
@@ -310,6 +436,8 @@ def _load_state(path: Path, goal_id: str) -> RunnerState:
         goal_id=raw_goal_id,
         current_cycle_id=current_cycle_id,
         current_ticket=current_ticket,
+        pending_feedback_id=pending_feedback_id,
+        last_consumed_feedback_id=last_consumed_feedback_id,
         cycles_started=cycles_started,
         cycles_finalized=cycles_finalized,
         history=history,
@@ -325,73 +453,27 @@ def _write_state(path: Path, state: RunnerState) -> None:
     _write_json(path, state.to_dict())
 
 
-def _split_row(line: str) -> list[str] | None:
-    stripped = line.strip()
-    if not stripped.startswith("|") or not stripped.endswith("|"):
+def _load_operator_feedback(path: Path) -> OperatorFeedback | None:
+    if not path.exists():
         return None
-    cells = [cell.strip() for cell in stripped.split("|")[1:-1]]
-    return cells
-
-
-def _parse_tickets(path: Path) -> TicketsDocument:
-    lines = path.read_text(encoding="utf-8").splitlines()
-    header_index = -1
-    for index, line in enumerate(lines):
-        if line.strip() == "| Task Type | Task | Description | Status |":
-            header_index = index
-            break
-    if header_index < 0:
-        raise ValueError("Could not find ticket table header in tickets.md")
-
-    if header_index + 1 >= len(lines):
-        raise ValueError("tickets.md missing table separator line.")
-    separator_line = lines[header_index + 1]
-    if not separator_line.strip().startswith("| ---"):
-        raise ValueError("tickets.md has invalid table separator line.")
-
-    rows: list[TicketRow] = []
-    cursor = header_index + 2
-    while cursor < len(lines):
-        cells = _split_row(lines[cursor])
-        if cells is None:
-            break
-        if len(cells) != 4:
-            raise ValueError(f"Invalid ticket table row at line {cursor + 1}.")
-        task_type_text, task, description, status_text = cells
-        try:
-            task_type = TaskType(task_type_text)
-        except ValueError as exc:
-            raise ValueError(
-                f"Unsupported task type in tickets row {cursor + 1}: {task_type_text}"
-            ) from exc
-        try:
-            status = TicketStatus(status_text)
-        except ValueError as exc:
-            raise ValueError(
-                f"Unsupported ticket status in row {cursor + 1}: {status_text}"
-            ) from exc
-        rows.append(
-            TicketRow(task_type=task_type, task=task, description=description, status=status)
-        )
-        cursor += 1
-
-    return TicketsDocument(
-        prefix_lines=lines[:header_index],
-        header_line=lines[header_index],
-        separator_line=separator_line,
-        rows=rows,
-        suffix_lines=lines[cursor:],
+    raw = _read_json_object(path, context="operator feedback")
+    version = _expect_int(raw, "version", "operator_feedback")
+    if version != 1:
+        raise ValueError("operator_feedback.version must be 1.")
+    feedback_id = _expect_string(raw, "feedback_id", "operator_feedback")
+    target_ticket = _expect_string(raw, "target_ticket", "operator_feedback")
+    summary = _expect_string(raw, "summary", "operator_feedback")
+    required_planner_action = _expect_string(raw, "required_planner_action", "operator_feedback")
+    return OperatorFeedback(
+        feedback_id=feedback_id,
+        target_ticket=target_ticket,
+        summary=summary,
+        required_planner_action=required_planner_action,
     )
 
 
-def _write_tickets(path: Path, tickets: TicketsDocument) -> None:
-    out_lines: list[str] = []
-    out_lines.extend(tickets.prefix_lines)
-    out_lines.append(tickets.header_line)
-    out_lines.append(tickets.separator_line)
-    out_lines.extend(row.to_markdown_row() for row in tickets.rows)
-    out_lines.extend(tickets.suffix_lines)
-    path.write_text("\n".join(out_lines) + "\n", encoding="utf-8")
+def _feedback_applies(feedback: OperatorFeedback, ticket_title: str) -> bool:
+    return feedback.target_ticket == "*" or feedback.target_ticket == ticket_title
 
 
 def _find_ticket_index(rows: list[TicketRow], title: str) -> int | None:
@@ -425,7 +507,7 @@ def _replace_status(
     return updated
 
 
-def _select_ticket(rows: list[TicketRow]) -> tuple[int, bool]:
+def _select_ticket(rows: list[TicketRow], *, selection_policy: SelectionPolicy) -> tuple[int, bool]:
     in_progress = [
         index for index, row in enumerate(rows) if row.status == TicketStatus.IN_PROGRESS
     ]
@@ -434,9 +516,22 @@ def _select_ticket(rows: list[TicketRow]) -> tuple[int, bool]:
     if len(in_progress) == 1:
         return in_progress[0], False
 
-    for index, row in enumerate(rows):
-        if row.status == TicketStatus.TODO:
-            return index, True
+    todo_indexes = [index for index, row in enumerate(rows) if row.status == TicketStatus.TODO]
+    wip_indexes = [index for index, row in enumerate(rows) if row.status == TicketStatus.WIP]
+
+    if selection_policy == SelectionPolicy.IN_PROGRESS_THEN_TODO:
+        if todo_indexes:
+            return todo_indexes[0], True
+        if wip_indexes:
+            return wip_indexes[0], False
+    elif selection_policy == SelectionPolicy.TODO_THEN_IN_PROGRESS:
+        if wip_indexes:
+            return wip_indexes[0], False
+        if todo_indexes:
+            return todo_indexes[0], True
+    else:
+        raise ValueError(f"Unsupported selection policy: {selection_policy.value}")
+
     raise ValueError(
         "No runnable ticket found. Require one IN_PROGRESS or at least one TODO ticket."
     )
@@ -489,9 +584,16 @@ def _start_cycle(
     state: RunnerState,
     tickets_path: Path,
     cycles_root: Path,
+    ticket_backend: TicketBackend,
+    operator_feedback_path: Path,
+    role_commands: RoleCommands,
 ) -> tuple[RunnerState, str]:
-    tickets = _parse_tickets(tickets_path)
-    index, promote = _select_ticket(tickets.rows)
+    policy_pack = POLICY_PACKS[goal.policy_pack]
+    tickets = ticket_backend.load(tickets_path)
+    index, promote = _select_ticket(
+        tickets.rows,
+        selection_policy=policy_pack.selection_policy,
+    )
     rows = list(tickets.rows)
 
     if promote:
@@ -502,6 +604,15 @@ def _start_cycle(
     cycle_dir = cycles_root / cycle_id
     cycle_dir.mkdir(parents=True, exist_ok=True)
 
+    operator_feedback = _load_operator_feedback(operator_feedback_path)
+    pending_feedback_id: str | None = None
+    if (
+        operator_feedback is not None
+        and _feedback_applies(operator_feedback, selected.task)
+        and operator_feedback.feedback_id != state.last_consumed_feedback_id
+    ):
+        pending_feedback_id = operator_feedback.feedback_id
+
     cycle_context = {
         "version": 1,
         "generated_at": _utc_now_iso(),
@@ -511,7 +622,7 @@ def _start_cycle(
             "completion_mode": goal.completion_mode.value,
             "target_tickets": goal.target_tickets,
             "max_cycles": goal.max_cycles,
-            "prune_profile": goal.prune_profile.value,
+            "policy_pack": goal.policy_pack.value,
             "stop_conditions": goal.stop_conditions,
         },
         "ticket": {
@@ -528,7 +639,18 @@ def _start_cycle(
             ),
             "cyclesmith memory -- --memory reports/dev_loop/memory_snapshot.json validate",
         ],
+        "role_execution": {
+            "mode": role_commands.mode(),
+            "configured_roles": role_commands.configured_roles(),
+        },
     }
+    if operator_feedback is not None and pending_feedback_id is not None:
+        cycle_context["operator_feedback"] = {
+            "feedback_id": operator_feedback.feedback_id,
+            "target_ticket": operator_feedback.target_ticket,
+            "summary": operator_feedback.summary,
+            "required_planner_action": operator_feedback.required_planner_action,
+        }
     _write_json(cycle_dir / "cycle_context.json", cycle_context)
 
     updated_tickets = TicketsDocument(
@@ -538,13 +660,15 @@ def _start_cycle(
         rows=rows,
         suffix_lines=tickets.suffix_lines,
     )
-    _write_tickets(tickets_path, updated_tickets)
+    ticket_backend.save(tickets_path, updated_tickets)
 
     new_state = RunnerState(
         version=state.version,
         goal_id=state.goal_id,
         current_cycle_id=cycle_id,
         current_ticket=selected.task,
+        pending_feedback_id=pending_feedback_id,
+        last_consumed_feedback_id=state.last_consumed_feedback_id,
         cycles_started=state.cycles_started + 1,
         cycles_finalized=state.cycles_finalized,
         history=state.history,
@@ -552,8 +676,10 @@ def _start_cycle(
     return new_state, selected.task
 
 
-def _run_subprocess(command: list[str]) -> subprocess.CompletedProcess[str]:
-    return subprocess.run(command, check=False, capture_output=True, text=True)
+def _run_subprocess(
+    command: list[str], *, env: dict[str, str] | None = None
+) -> subprocess.CompletedProcess[str]:
+    return subprocess.run(command, check=False, capture_output=True, text=True, env=env)
 
 
 def _run_checked(command: list[str], *, context: str) -> None:
@@ -564,6 +690,58 @@ def _run_checked(command: list[str], *, context: str) -> None:
     if result.stderr.strip():
         output = f"{output}\n{result.stderr.strip()}".strip()
     raise ValueError(f"{context} failed (exit={result.returncode}):\n{output}")
+
+
+def _next_missing_role(cycle_dir: Path) -> RoleName | None:
+    for role, artifact_name in ROLE_SEQUENCE:
+        if not (cycle_dir / artifact_name).exists():
+            return role
+    return None
+
+
+def _missing_artifacts(cycle_dir: Path) -> list[str]:
+    missing: list[str] = []
+    for _, artifact_name in ROLE_SEQUENCE:
+        if not (cycle_dir / artifact_name).exists():
+            missing.append(artifact_name)
+    return missing
+
+
+def _run_role_command(
+    *,
+    role: RoleName,
+    command: tuple[str, ...],
+    goal: GoalConfig,
+    state: RunnerState,
+    cycle_dir: Path,
+    tickets_path: Path,
+    tickets_backend_kind: TicketBackendKind,
+    operator_feedback_path: Path,
+) -> None:
+    if state.current_cycle_id is None or state.current_ticket is None:
+        raise ValueError("No active cycle available for role execution.")
+
+    env = dict(os.environ)
+    env["CYCLESMITH_ROLE"] = role.value
+    env["CYCLESMITH_GOAL_ID"] = goal.goal_id
+    env["CYCLESMITH_CYCLE_ID"] = state.current_cycle_id
+    env["CYCLESMITH_CYCLE_DIR"] = str(cycle_dir)
+    env["CYCLESMITH_TICKET_TITLE"] = state.current_ticket
+    env["CYCLESMITH_TICKETS_PATH"] = str(tickets_path)
+    env["CYCLESMITH_TICKETS_BACKEND"] = tickets_backend_kind.value
+    env["CYCLESMITH_OPERATOR_FEEDBACK_PATH"] = str(operator_feedback_path)
+    if state.pending_feedback_id is not None:
+        env["CYCLESMITH_PENDING_FEEDBACK_ID"] = state.pending_feedback_id
+
+    result = _run_subprocess(list(command), env=env)
+    if result.returncode == 0:
+        print(f"[runner] Executed {role.value} role command for cycle {state.current_cycle_id}.")
+        return
+
+    output = result.stdout.strip()
+    if result.stderr.strip():
+        output = f"{output}\n{result.stderr.strip()}".strip()
+    raise ValueError(f"{role.value} role command failed (exit={result.returncode}):\n{output}")
 
 
 def _load_judge(path: Path) -> tuple[str, str, TicketStatus, str, list[dict[str, str]]]:
@@ -643,8 +821,8 @@ def _maybe_prune_memory(
     memory_path: Path,
     cycles_root: Path,
 ) -> tuple[bool, list[str]]:
-    cadence, max_lag, stale_unknown, dry_run = PRUNE_POLICY[goal.prune_profile]
-    if finalized_count % cadence != 0:
+    policy_pack = POLICY_PACKS[goal.policy_pack]
+    if finalized_count % policy_pack.prune_cadence_cycles != 0:
         return False, []
 
     command = [
@@ -656,13 +834,13 @@ def _maybe_prune_memory(
         "--current-cycle",
         current_cycle,
         "--max-cycle-lag",
-        str(max_lag),
+        str(policy_pack.prune_max_cycle_lag),
         "--cycles-root",
         str(cycles_root),
     ]
-    if stale_unknown:
+    if policy_pack.prune_stale_unknown:
         command.append("--stale-unknown")
-    if dry_run:
+    if policy_pack.prune_dry_run:
         command.append("--dry-run")
 
     _run_checked(command, context="memory prune")
@@ -676,6 +854,8 @@ def _finalize_cycle(
     tickets_path: Path,
     cycles_root: Path,
     memory_path: Path,
+    ticket_backend: TicketBackend,
+    tickets_backend_kind: TicketBackendKind,
 ) -> RunnerState:
     if state.current_cycle_id is None or state.current_ticket is None:
         raise ValueError("No active cycle to finalize.")
@@ -695,10 +875,26 @@ def _finalize_cycle(
             str(cycle_dir),
             "--tickets",
             str(tickets_path),
+            "--tickets-backend",
+            tickets_backend_kind.value,
             "--validate-schema",
         ],
         context="cycle artifact validation",
     )
+
+    if state.pending_feedback_id is not None:
+        planner_raw = _read_json_object(cycle_dir / "planner.json", context="planner artifact")
+        refs = planner_raw.get("operator_feedback_refs")
+        if not isinstance(refs, list):
+            raise ValueError(
+                "planner.operator_feedback_refs must be a list when operator feedback is pending."
+            )
+        normalized_refs = [ref for ref in refs if isinstance(ref, str)]
+        if state.pending_feedback_id not in normalized_refs:
+            raise ValueError(
+                "planner must acknowledge pending operator feedback via "
+                f"operator_feedback_refs containing {state.pending_feedback_id}."
+            )
 
     cycle_id, ticket_title, transition, verdict, follow_ups = _load_judge(cycle_dir / "judge.json")
     if cycle_id != state.current_cycle_id:
@@ -710,14 +906,21 @@ def _finalize_cycle(
             f"judge.ticket_title mismatch: expected {state.current_ticket}, found {ticket_title}"
         )
 
-    tickets = _parse_tickets(tickets_path)
+    required_follow_up_count = POLICY_PACKS[goal.policy_pack].min_follow_up_tickets
+    if transition != TicketStatus.REVIEW and len(follow_ups) < required_follow_up_count:
+        raise ValueError(
+            "policy pack requires at least "
+            f"{required_follow_up_count} follow_up_tickets for non-pass transitions."
+        )
+
+    tickets = ticket_backend.load(tickets_path)
     ticket_index = _find_ticket_index(tickets.rows, ticket_title)
     if ticket_index is None:
         raise ValueError(f"Ticket not found in tickets.md: {ticket_title}")
 
     transitioned_rows = _replace_status(tickets.rows, ticket_index, transition)
     merged_rows, follow_up_added = _merge_follow_ups(transitioned_rows, follow_ups)
-    _write_tickets(
+    ticket_backend.save(
         tickets_path,
         TicketsDocument(
             prefix_lines=tickets.prefix_lines,
@@ -791,6 +994,12 @@ def _finalize_cycle(
         goal_id=state.goal_id,
         current_cycle_id=None,
         current_ticket=None,
+        pending_feedback_id=None,
+        last_consumed_feedback_id=(
+            state.pending_feedback_id
+            if state.pending_feedback_id is not None
+            else state.last_consumed_feedback_id
+        ),
         cycles_started=state.cycles_started,
         cycles_finalized=next_finalized,
         history=history,
@@ -820,17 +1029,34 @@ def _run_loop(
     tickets_path: Path,
     cycles_root: Path,
     memory_path: Path,
+    ticket_backend: TicketBackend,
+    tickets_backend_kind: TicketBackendKind,
+    operator_feedback_path: Path | None,
+    planner_command_override: list[str] | None,
+    worker_command_override: list[str] | None,
+    judge_command_override: list[str] | None,
     max_actions: int,
 ) -> int:
     if max_actions <= 0:
         raise ValueError("--max-actions must be > 0.")
 
     goal = _parse_goal(goal_path)
+    role_commands = _resolve_role_commands(
+        goal_role_commands=goal.role_commands,
+        planner_override=planner_command_override,
+        worker_override=worker_command_override,
+        judge_override=judge_command_override,
+    )
     state = _load_state(state_path, goal.goal_id)
     actions = 0
+    resolved_operator_feedback_path = (
+        operator_feedback_path
+        if operator_feedback_path is not None
+        else cycles_root / "operator_feedback.json"
+    )
 
     while actions < max_actions:
-        tickets = _parse_tickets(tickets_path)
+        tickets = ticket_backend.load(tickets_path)
         if _is_goal_complete(goal, tickets.rows):
             print(f"[runner] Goal complete: {goal.goal_id}")
             _write_state(state_path, state)
@@ -844,14 +1070,27 @@ def _run_loop(
 
         if state.current_cycle_id is not None:
             cycle_dir = cycles_root / state.current_cycle_id
-            has_all_artifacts = all(
-                (cycle_dir / name).exists()
-                for name in ("planner.json", "worker.json", "judge.json")
-            )
-            if not has_all_artifacts:
+            pending_role = _next_missing_role(cycle_dir)
+            if pending_role is not None:
+                role_command = role_commands.for_role(pending_role)
+                if role_command is not None:
+                    _run_role_command(
+                        role=pending_role,
+                        command=role_command,
+                        goal=goal,
+                        state=state,
+                        cycle_dir=cycle_dir,
+                        tickets_path=tickets_path,
+                        tickets_backend_kind=tickets_backend_kind,
+                        operator_feedback_path=resolved_operator_feedback_path,
+                    )
+                    actions += 1
+                    continue
+
+                missing_artifacts = _missing_artifacts(cycle_dir)
                 print(
                     "[runner] Waiting for role artifacts in "
-                    f"{cycle_dir}. Expected planner.json, worker.json, judge.json."
+                    f"{cycle_dir}. Missing: {', '.join(missing_artifacts)}."
                 )
                 _write_state(state_path, state)
                 print(_status_summary(goal=goal, state=state, rows=tickets.rows))
@@ -862,6 +1101,8 @@ def _run_loop(
                 tickets_path=tickets_path,
                 cycles_root=cycles_root,
                 memory_path=memory_path,
+                ticket_backend=ticket_backend,
+                tickets_backend_kind=tickets_backend_kind,
             )
             _write_state(state_path, state)
             actions += 1
@@ -872,18 +1113,27 @@ def _run_loop(
             state=state,
             tickets_path=tickets_path,
             cycles_root=cycles_root,
+            ticket_backend=ticket_backend,
+            operator_feedback_path=resolved_operator_feedback_path,
+            role_commands=role_commands,
         )
         _write_state(state_path, state)
         actions += 1
         print(f"[runner] Started cycle {state.current_cycle_id} for ticket: {selected_ticket}")
 
-    tickets = _parse_tickets(tickets_path)
+    tickets = ticket_backend.load(tickets_path)
     print(_status_summary(goal=goal, state=state, rows=tickets.rows))
     return 0
 
 
-def _init_goal(path: Path, tickets_path: Path, goal_id: str, objective: str) -> int:
-    tickets = _parse_tickets(tickets_path)
+def _init_goal(
+    path: Path,
+    tickets_path: Path,
+    goal_id: str,
+    objective: str,
+    ticket_backend: TicketBackend,
+) -> int:
+    tickets = ticket_backend.load(tickets_path)
     default_targets = [
         row.task
         for row in tickets.rows
@@ -896,7 +1146,8 @@ def _init_goal(path: Path, tickets_path: Path, goal_id: str, objective: str) -> 
         "completion_mode": GoalCompletionMode.TARGET_TICKETS_CLOSED.value,
         "target_tickets": default_targets,
         "max_cycles": 20,
-        "prune_profile": PruneProfile.SHARED_BRANCH.value,
+        "policy_pack": PolicyPack.SHARED_BRANCH.value,
+        "prune_profile": PolicyPack.SHARED_BRANCH.value,
         "stop_conditions": [
             "same ticket receives three consecutive rework verdicts",
             "two consecutive cycles produce failing required checks",
@@ -931,7 +1182,14 @@ def build_parser() -> argparse.ArgumentParser:
         "--tickets",
         type=Path,
         default=Path("tickets.md"),
-        help="Path to tickets markdown file.",
+        help="Path to tickets file.",
+    )
+    run_parser.add_argument(
+        "--tickets-backend",
+        type=str,
+        default=TicketBackendKind.MARKDOWN.value,
+        choices=[kind.value for kind in TicketBackendKind],
+        help="Ticket backend type.",
     )
     run_parser.add_argument(
         "--cycles-root",
@@ -944,6 +1202,39 @@ def build_parser() -> argparse.ArgumentParser:
         type=Path,
         default=Path("reports/dev_loop/memory_snapshot.json"),
         help="Path to memory snapshot JSON.",
+    )
+    run_parser.add_argument(
+        "--operator-feedback",
+        type=Path,
+        default=None,
+        help="Optional operator feedback contract path.",
+    )
+    run_parser.add_argument(
+        "--planner-command",
+        nargs="+",
+        default=None,
+        help=(
+            "Optional command tokens to execute planner role automatically. "
+            "Runner sets CYCLESMITH_* env vars for cycle context."
+        ),
+    )
+    run_parser.add_argument(
+        "--worker-command",
+        nargs="+",
+        default=None,
+        help=(
+            "Optional command tokens to execute worker role automatically. "
+            "Runner sets CYCLESMITH_* env vars for cycle context."
+        ),
+    )
+    run_parser.add_argument(
+        "--judge-command",
+        nargs="+",
+        default=None,
+        help=(
+            "Optional command tokens to execute judge role automatically. "
+            "Runner sets CYCLESMITH_* env vars for cycle context."
+        ),
     )
     run_parser.add_argument(
         "--max-actions",
@@ -966,7 +1257,14 @@ def build_parser() -> argparse.ArgumentParser:
         "--tickets",
         type=Path,
         default=Path("tickets.md"),
-        help="Path to tickets markdown file.",
+        help="Path to tickets file.",
+    )
+    init_goal_parser.add_argument(
+        "--tickets-backend",
+        type=str,
+        default=TicketBackendKind.MARKDOWN.value,
+        choices=[kind.value for kind in TicketBackendKind],
+        help="Ticket backend type.",
     )
     init_goal_parser.add_argument(
         "--goal-id",
@@ -998,6 +1296,9 @@ def main(argv: list[str] | None = None) -> int:
     args = parser.parse_args(argv)
 
     try:
+        ticket_backend_kind = TicketBackendKind(args.tickets_backend)
+        ticket_backend = resolve_ticket_backend(ticket_backend_kind)
+
         if args.command == "run":
             return _run_loop(
                 goal_path=args.goal,
@@ -1005,6 +1306,12 @@ def main(argv: list[str] | None = None) -> int:
                 tickets_path=args.tickets,
                 cycles_root=args.cycles_root,
                 memory_path=args.memory,
+                ticket_backend=ticket_backend,
+                tickets_backend_kind=ticket_backend_kind,
+                operator_feedback_path=args.operator_feedback,
+                planner_command_override=args.planner_command,
+                worker_command_override=args.worker_command,
+                judge_command_override=args.judge_command,
                 max_actions=args.max_actions,
             )
         if args.command == "init-goal":
@@ -1013,6 +1320,7 @@ def main(argv: list[str] | None = None) -> int:
                 tickets_path=args.tickets,
                 goal_id=args.goal_id,
                 objective=args.objective,
+                ticket_backend=ticket_backend,
             )
         raise ValueError(f"Unsupported command: {args.command}")
     except (ValueError, FileNotFoundError, json.JSONDecodeError) as exc:
