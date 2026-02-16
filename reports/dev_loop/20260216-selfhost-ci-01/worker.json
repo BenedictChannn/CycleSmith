@@ -1,0 +1,57 @@
+{
+  "cycle_id": "20260216-selfhost-ci-01",
+  "ticket_title": "Add CI workflow for lint, type, and smoke tests",
+  "step_results": [
+    {
+      "step_id": "S1",
+      "status": "done",
+      "notes": "Added `quality` and `workflow_compliance` jobs in GitHub Actions.",
+      "files_touched": [
+        ".github/workflows/ci.yml"
+      ],
+      "commands_run": [
+        "uv run ruff check .",
+        "uv run ty check .",
+        "uv run pytest -q"
+      ]
+    },
+    {
+      "step_id": "S2",
+      "status": "done",
+      "notes": "Implemented compliance checker module and wrapper script with policy assertions.",
+      "files_touched": [
+        "scripts/check_workflow_compliance.py",
+        "src/cyclesmith/dev_loop/workflow_compliance.py",
+        "tests/test_workflow_compliance.py"
+      ],
+      "commands_run": [
+        "uv run pytest -q tests/test_workflow_compliance.py"
+      ]
+    },
+    {
+      "step_id": "S3",
+      "status": "done",
+      "notes": "Added dogfooding docs plus root goal/memory/example cycle assets.",
+      "files_touched": [
+        "docs/dev_loop.md",
+        "docs/runbook_quickstart.md",
+        "docs/benchmark_protocol.md",
+        "reports/dev_loop/goal.json",
+        "reports/dev_loop/memory_snapshot.json"
+      ],
+      "commands_run": [
+        "uv run cyclesmith memory -- --memory reports/dev_loop/memory_snapshot.json validate"
+      ]
+    }
+  ],
+  "checks": {
+    "ruff_check": "pass",
+    "ruff_format": "pass",
+    "ty_check": "pass",
+    "pytest": "pass",
+    "rust_checks": "pass"
+  },
+  "result_status": "partial",
+  "blockers": [],
+  "next_role": "JUDGE"
+}

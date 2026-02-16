@@ -9,6 +9,7 @@ workflow reliability, CI confidence, and operator control.
 
 1. CI gates:
    - add workflow for `ruff`, `ty`, `pytest`
+   - add workflow-compliance gate enforcing cycle artifacts, memory sync, and ticket coupling
    - ensure deterministic execution on Windows/Linux runners
 2. Operator feedback ingestion:
    - optional `operator_feedback.json` contract
@@ -29,7 +30,7 @@ workflow reliability, CI confidence, and operator control.
 ## Acceptance Criteria
 
 - CI passes on PRs with same gates used locally
+- non-maintenance PRs fail when workflow-compliance invariants are violated
 - runner can consume operator feedback without breaking existing flows
 - policy packs selectable via explicit profile enum
 - all new behavior covered by tests and reflected in docs/tickets
-

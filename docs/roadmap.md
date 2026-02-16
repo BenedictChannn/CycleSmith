@@ -17,6 +17,7 @@ without coupling to any single product codebase.
 ### M2: Execution Hardening (Current)
 
 - CI workflow for lint/type/test gates
+- strict self-hosting workflow compliance gate in CI
 - operator feedback ingestion in cycle flow
 - planner policy packs for multi-project defaults
 - stronger ticket/backend boundaries
@@ -32,4 +33,3 @@ without coupling to any single product codebase.
 - bounded long-run orchestration semantics
 - pause/resume controls
 - richer progress telemetry and audit artifacts
-

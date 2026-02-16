@@ -1,0 +1,39 @@
+{
+  "cycle_id": "example-cycle",
+  "ticket": {
+    "type": "FEATURE",
+    "title": "Example in-progress ticket",
+    "status_before": "IN_PROGRESS"
+  },
+  "objective": "Reference planner artifact for dry-run validation.",
+  "scope_in": [
+    "docs/autonomy-lite/*",
+    "src/*",
+    "tests/*"
+  ],
+  "scope_out": [
+    "unrelated subsystems",
+    "external integrations"
+  ],
+  "steps": [
+    {
+      "id": "S1",
+      "action": "Define role contracts and schemas.",
+      "files": [
+        "docs/autonomy-lite/role_planner.md",
+        "docs/autonomy-lite/role_worker.md",
+        "docs/autonomy-lite/role_judge.md"
+      ],
+      "validation": [
+        "manual review"
+      ]
+    }
+  ],
+  "risks": [
+    "Schema drift between docs and validator."
+  ],
+  "handoff_constraints": [
+    "Do not mark pass when required checks are missing."
+  ],
+  "next_role": "WORKER"
+}

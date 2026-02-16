@@ -1,0 +1,29 @@
+{
+  "cycle_id": "example-cycle",
+  "ticket_title": "Example in-progress ticket",
+  "step_results": [
+    {
+      "step_id": "S1",
+      "status": "done",
+      "notes": "Reference worker evidence.",
+      "files_touched": [
+        "docs/autonomy-lite/role_planner.md",
+        "docs/autonomy-lite/role_worker.md",
+        "docs/autonomy-lite/role_judge.md"
+      ],
+      "commands_run": [
+        "manual review"
+      ]
+    }
+  ],
+  "checks": {
+    "ruff_check": "pass",
+    "ruff_format": "pass",
+    "ty_check": "pass",
+    "pytest": "pass",
+    "rust_checks": "pass"
+  },
+  "result_status": "implemented",
+  "blockers": [],
+  "next_role": "JUDGE"
+}

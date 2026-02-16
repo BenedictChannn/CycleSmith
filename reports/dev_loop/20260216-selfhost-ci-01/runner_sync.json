@@ -1,0 +1,12 @@
+{
+  "version": 1,
+  "synced_at": "2026-02-16T00:00:00Z",
+  "cycle_id": "20260216-selfhost-ci-01",
+  "ticket_title": "Add CI workflow for lint, type, and smoke tests",
+  "verdict": "rework",
+  "ticket_transition": "IN_PROGRESS",
+  "follow_up_tickets_added": 1,
+  "memory_ingest": true,
+  "memory_prune_triggered": false,
+  "memory_prune_command": []
+}

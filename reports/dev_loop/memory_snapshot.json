@@ -1,0 +1,37 @@
+{
+  "version": 1,
+  "updated_at": "2026-02-16T10:20:13Z",
+  "current_focus": "self-hosted workflow compliance hardening",
+  "items": [
+    {
+      "id": "MEM-0001",
+      "title": "Required branch protection checks are not encoded in repository files.",
+      "kind": "regression",
+      "status": "active",
+      "confidence": "medium",
+      "detail": ".github/settings: Configure `quality` and `workflow_compliance` as required checks in GitHub settings.",
+      "source_cycle": "20260216-selfhost-ci-01",
+      "source_file": "reports/dev_loop/20260216-selfhost-ci-01/judge.json",
+      "last_verified_cycle": "20260216-selfhost-ci-01",
+      "tags": [
+        "finding",
+        "medium"
+      ]
+    },
+    {
+      "id": "MEM-0002",
+      "title": "Configure protected branch required status checks",
+      "kind": "todo_hint",
+      "status": "active",
+      "confidence": "medium",
+      "detail": "Require `quality` and `workflow_compliance` checks before merge in GitHub settings.",
+      "source_cycle": "20260216-selfhost-ci-01",
+      "source_file": "reports/dev_loop/20260216-selfhost-ci-01/judge.json",
+      "last_verified_cycle": "20260216-selfhost-ci-01",
+      "tags": [
+        "chore",
+        "follow-up"
+      ]
+    }
+  ]
+}
