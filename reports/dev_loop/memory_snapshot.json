@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "updated_at": "2026-02-16T11:07:31Z",
+  "updated_at": "2026-02-16T13:37:36Z",
   "current_focus": "phase2 hardening completion",
   "items": [
     {
@@ -31,6 +31,21 @@
       "tags": [
         "chore",
         "follow-up"
+      ]
+    },
+    {
+      "id": "MEM-0003",
+      "title": "External repository adoption run is still pending.",
+      "kind": "risk",
+      "status": "active",
+      "confidence": "medium",
+      "detail": "docs/plans/phase3_plan.md: Run CycleSmith in one external repository and capture migration results.",
+      "source_cycle": "20260216-template-versioning-02",
+      "source_file": "reports/dev_loop/20260216-template-versioning-02/judge.json",
+      "last_verified_cycle": "20260216-template-versioning-02",
+      "tags": [
+        "finding",
+        "low"
       ]
     }
   ]

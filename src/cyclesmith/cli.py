@@ -3,8 +3,10 @@
 from __future__ import annotations
 
 import argparse
+import json
 from pathlib import Path
 
+from cyclesmith import template_version
 from cyclesmith.dev_loop import memory_snapshot, run_cycle, validate_cycle_artifacts
 from cyclesmith.hooks import enforce_ticket_loop, install_hooks
 from cyclesmith.init_project import initialize_project
@@ -68,12 +70,33 @@ def _add_install_hooks_subcommand(
     )
 
 
+def _add_template_status_subcommand(
+    subparsers: argparse._SubParsersAction[argparse.ArgumentParser],
+) -> None:
+    parser = subparsers.add_parser(
+        "template-status",
+        help="Show template metadata and upgrade status for a repository.",
+    )
+    parser.add_argument(
+        "--repo-root",
+        type=Path,
+        default=Path("."),
+        help="Repository root containing CycleSmith metadata.",
+    )
+    parser.add_argument(
+        "--json",
+        action="store_true",
+        help="Print machine-readable JSON output.",
+    )
+
+
 def build_parser() -> argparse.ArgumentParser:
     """Build top-level CLI parser."""
     parser = argparse.ArgumentParser(description="CycleSmith autonomy-loop toolkit.")
     subparsers = parser.add_subparsers(dest="command", required=True)
     _add_init_subcommand(subparsers)
     _add_install_hooks_subcommand(subparsers)
+    _add_template_status_subcommand(subparsers)
     _add_runner_subcommand(subparsers)
     _add_validate_subcommand(subparsers)
     _add_memory_subcommand(subparsers)
@@ -101,7 +124,8 @@ def main(argv: list[str] | None = None) -> int:
         print(
             "[cyclesmith] init complete: "
             f"target={summary.target_root}, created={summary.created_count}, "
-            f"skipped={summary.skipped_count}"
+            f"skipped={summary.skipped_count}, template_version={summary.template_version}, "
+            f"sync_mode={summary.sync_mode.value}"
         )
         if args.install_hooks:
             return install_hooks.main(["--repo-root", str(args.target)])
@@ -109,6 +133,21 @@ def main(argv: list[str] | None = None) -> int:
 
     if args.command == "install-hooks":
         return install_hooks.main(["--repo-root", str(args.repo_root)])
+
+    if args.command == "template-status":
+        report = template_version.assess_template_status(repo_root=args.repo_root.resolve())
+        if args.json:
+            print(json.dumps(report.to_dict(), indent=2))
+        else:
+            print(
+                "[cyclesmith] template status: "
+                f"status={report.status.value}, repo={report.repo_root}, "
+                f"repo_template={report.repo_template_version or 'none'}, "
+                f"current_template={report.current_template_version}, "
+                f"sync_mode={(report.sync_mode.value if report.sync_mode is not None else 'none')}"
+            )
+            print(f"[cyclesmith] {report.message}")
+        return 0
 
     if args.command == "runner":
         runner_args: list[str] = args.runner_args

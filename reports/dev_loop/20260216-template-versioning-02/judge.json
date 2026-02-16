@@ -1,0 +1,33 @@
+{
+  "cycle_id": "20260216-template-versioning-02",
+  "ticket_title": "Add template version metadata and upgrade status command",
+  "findings": [
+    {
+      "severity": "low",
+      "where": "docs/plans/phase3_plan.md",
+      "issue": "External repository adoption run is still pending.",
+      "required_action": "Run CycleSmith in one external repository and capture migration results."
+    }
+  ],
+  "qa_verification": [
+    {
+      "command": "uv run ruff check .",
+      "result": "pass",
+      "evidence": "Lint passes with new template version module and CLI wiring."
+    },
+    {
+      "command": "uv run ty check .",
+      "result": "pass",
+      "evidence": "Type checking passes with explicit enums/dataclasses."
+    },
+    {
+      "command": "uv run pytest -q",
+      "result": "pass",
+      "evidence": "All tests pass including new template-version coverage."
+    }
+  ],
+  "verdict": "pass",
+  "ticket_transition": "REVIEW",
+  "follow_up_tickets": [],
+  "next_cycle_focus": "Run external-repo adoption and capture migration friction points."
+}

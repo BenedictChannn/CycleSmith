@@ -23,6 +23,7 @@ uv sync
 
 ```bash
 cyclesmith init --target . --install-hooks
+cyclesmith template-status --repo-root .
 cyclesmith runner -- init-goal --goal reports/dev_loop/goal.json
 cyclesmith runner -- run --goal reports/dev_loop/goal.json --max-actions 2
 cyclesmith runner -- run --goal reports/dev_loop/goal.json --tickets tickets.json --tickets-backend json --max-actions 2
@@ -33,6 +34,8 @@ cyclesmith validate -- --cycle-dir reports/dev_loop/example_cycle --tickets tick
 ```
 
 Role command mode sets `CYCLESMITH_*` environment variables for each role invocation.
+`cyclesmith init` writes `.cyclesmith/template_version.json` metadata used by
+`cyclesmith template-status`.
 
 ## Self-Hosted Workflow
 
@@ -57,8 +60,10 @@ uv run python scripts/check_workflow_compliance.py --base-ref HEAD~1 --head-ref 
 - `docs/benchmark_protocol.md`
 - `docs/operator_feedback_contract.md`
 - `docs/contributor_runbook.md`
+- `docs/template_versioning.md`
 - `docs/roadmap.md`
 - `docs/plans/phase2_plan.md`
+- `docs/plans/phase3_plan.md`
 - `docs/migration/streamsafe_context.md`
 
 ## Quality Checks

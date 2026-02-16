@@ -9,7 +9,9 @@ existing repository.
    - `uv sync`
 2. Initialize files and hooks:
    - `cyclesmith init --target . --install-hooks`
-3. Confirm required files exist:
+3. Verify template metadata:
+   - `cyclesmith template-status --repo-root .`
+4. Confirm required files exist:
    - `START_HERE.md`
    - `tickets.md`
    - `reports/dev_loop/goal.json`
@@ -53,7 +55,17 @@ existing repository.
    - `workflow_compliance`
 3. Disallow direct pushes to protected branches where applicable.
 
-## 5) PR Requirements
+## 5) Template Upgrades
+
+1. Create a feature branch for template upgrades.
+2. Check current status:
+   - `cyclesmith template-status --repo-root .`
+3. Apply latest templates:
+   - `cyclesmith init --target . --force`
+4. Re-check status and expect `up_to_date`.
+5. Review local customizations in any conflicted files before merge.
+
+## 6) PR Requirements
 
 For non-maintenance changes:
 

@@ -12,6 +12,8 @@
 | FEATURE | Add command-driven role execution to runner | Allow runner to execute planner/worker/judge commands autonomously using goal/CLI command config and cycle env context | COMPLETED |
 | DOCS | Add contributor runbook for using CycleSmith across repos | Document rollout checklist and migration strategy for adopting templates in existing projects | COMPLETED |
 | CHORE | Configure protected branch required status checks | Require `quality` and `workflow_compliance` checks before merge in GitHub settings | COMPLETED |
+| FEATURE | Add template version metadata and upgrade status command | Persist template version state on init and expose `cyclesmith template-status` for safe multi-repo upgrades | COMPLETED |
+| FEATURE | Validate reference adoption in an external repository | Apply CycleSmith in at least one separate repo and capture migration feedback/issues | IN_PROGRESS |
 
 ---
 

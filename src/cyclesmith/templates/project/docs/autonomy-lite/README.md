@@ -55,6 +55,7 @@ Validate artifacts after each cycle:
 - `cyclesmith validate -- --cycle-dir reports/dev_loop/<cycle_id> --validate-schema`
 - `cyclesmith memory -- --memory reports/dev_loop/memory_snapshot.json ingest --cycle-dir reports/dev_loop/<cycle_id>`
 - `cyclesmith memory -- --memory reports/dev_loop/memory_snapshot.json validate`
+- `cyclesmith template-status --repo-root .` (for template upgrade readiness)
 - `cyclesmith memory -- --memory reports/dev_loop/memory_snapshot.json ingest-batch --strict --strict-report reports/dev_loop/strict_report.json --cycles-root reports/dev_loop` (for parallel cycle replay + machine-readable strict failure report)
 - `cyclesmith runner -- run --goal reports/dev_loop/goal.json --max-actions 2` (manual role mode: deterministic ticket selection + cycle start/finalize orchestration)
 - `cyclesmith runner -- run --goal reports/dev_loop/goal.json --planner-command python scripts/role_driver.py --worker-command python scripts/role_driver.py --judge-command python scripts/role_driver.py --max-actions 5` (command role mode: runner executes planner/worker/judge in-order)

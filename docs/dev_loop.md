@@ -22,6 +22,8 @@ provides to other repositories.
    - `uv run ruff check .`
    - `uv run ty check .`
    - `uv run pytest -q`
+8. Check template upgrade state when updating toolkit versions:
+   - `cyclesmith template-status --repo-root .`
 
 ## Role Execution Modes
 

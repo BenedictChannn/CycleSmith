@@ -18,12 +18,14 @@ This is the first file to read before continuing implementation in CycleSmith.
 6. `docs/operator_feedback_contract.md`
 7. `docs/roadmap.md`
 8. `docs/plans/phase2_plan.md`
-9. `docs/contributor_runbook.md`
-10. `docs/migration/streamsafe_context.md`
-11. `src/cyclesmith/templates/project/docs/autonomy-lite/README.md`
-12. `src/cyclesmith/templates/project/docs/autonomy-lite/artifact_contract.md`
-13. `src/cyclesmith/templates/project/docs/autonomy-lite/operator_runbook.md`
-14. `src/cyclesmith/templates/project/docs/autonomy-lite/memory_snapshot_contract.md`
+9. `docs/plans/phase3_plan.md`
+10. `docs/contributor_runbook.md`
+11. `docs/template_versioning.md`
+12. `docs/migration/streamsafe_context.md`
+13. `src/cyclesmith/templates/project/docs/autonomy-lite/README.md`
+14. `src/cyclesmith/templates/project/docs/autonomy-lite/artifact_contract.md`
+15. `src/cyclesmith/templates/project/docs/autonomy-lite/operator_runbook.md`
+16. `src/cyclesmith/templates/project/docs/autonomy-lite/memory_snapshot_contract.md`
 
 ## 3) Execution Rules
 

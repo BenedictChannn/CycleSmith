@@ -14,7 +14,7 @@ without coupling to any single product codebase.
 - templates (docs, schemas, sample cycle, hooks)
 - initial smoke-test coverage
 
-### M2: Execution Hardening (Current)
+### M2: Execution Hardening (Done)
 
 - CI workflow for lint/type/test gates
 - strict self-hosting workflow compliance gate in CI
@@ -22,11 +22,11 @@ without coupling to any single product codebase.
 - planner policy packs for multi-project defaults
 - stronger ticket/backend boundaries
 
-### M3: Multi-Repo Adoption
+### M3: Multi-Repo Adoption (Current)
 
 - contributor runbook + migration checklist
-- reference adoption in at least one external repo
 - template-versioning strategy and upgrade path
+- reference adoption in at least one external repo
 
 ### M4: Campaign-Scale Operations
 
