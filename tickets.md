@@ -11,7 +11,7 @@
 | FEATURE | Add ticket backend abstraction | Allow markdown (default) and JSON backends behind a strict typed interface without dynamic attributes | COMPLETED |
 | FEATURE | Add command-driven role execution to runner | Allow runner to execute planner/worker/judge commands autonomously using goal/CLI command config and cycle env context | COMPLETED |
 | DOCS | Add contributor runbook for using CycleSmith across repos | Document rollout checklist and migration strategy for adopting templates in existing projects | COMPLETED |
-| CHORE | Configure protected branch required status checks | Require `quality` and `workflow_compliance` checks before merge in GitHub settings | IN_PROGRESS |
+| CHORE | Configure protected branch required status checks | Require `quality` and `workflow_compliance` checks before merge in GitHub settings | COMPLETED |
 
 ---
 
