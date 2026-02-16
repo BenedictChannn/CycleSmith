@@ -1,0 +1,23 @@
+{
+  "version": 1,
+  "updated_at": "2026-02-13T07:51:36Z",
+  "current_focus": "dev-loop protocol hardening",
+  "items": [
+    {
+      "id": "MEM-0001",
+      "title": "Use scripts/cargo_msvc.cmd for rust tests on Windows",
+      "kind": "environment",
+      "status": "active",
+      "confidence": "high",
+      "detail": "The environment may resolve link.exe to Git's utility; run rust tests via scripts/cargo_msvc.cmd to ensure MSVC linker usage.",
+      "source_cycle": "example-cycle",
+      "source_file": "reports/dev_loop/example_cycle/judge.json",
+      "last_verified_cycle": "example-cycle",
+      "tags": [
+        "windows",
+        "rust",
+        "toolchain"
+      ]
+    }
+  ]
+}

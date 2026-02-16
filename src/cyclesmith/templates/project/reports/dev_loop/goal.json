@@ -1,0 +1,17 @@
+{
+  "version": 1,
+  "goal_id": "dev-loop-goal",
+  "objective": "Advance selected tickets through deterministic planner-worker-judge cycles.",
+  "completion_mode": "target_tickets_closed",
+  "target_tickets": [
+    "Example in-progress ticket",
+    "Example follow-up ticket"
+  ],
+  "max_cycles": 20,
+  "prune_profile": "shared-branch",
+  "stop_conditions": [
+    "same ticket receives three consecutive rework verdicts",
+    "two consecutive cycles produce failing required checks",
+    "operator requests pause"
+  ]
+}

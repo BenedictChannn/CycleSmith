@@ -1,0 +1,40 @@
+{
+  "cycle_id": "20260216-selfhost-ci-01",
+  "ticket_title": "Add CI workflow for lint, type, and smoke tests",
+  "findings": [
+    {
+      "severity": "medium",
+      "where": ".github/settings",
+      "issue": "Required branch protection checks are not encoded in repository files.",
+      "required_action": "Configure `quality` and `workflow_compliance` as required checks in GitHub settings."
+    }
+  ],
+  "qa_verification": [
+    {
+      "command": "uv run ruff check .",
+      "result": "pass",
+      "evidence": "Local lint check passes."
+    },
+    {
+      "command": "uv run ty check .",
+      "result": "pass",
+      "evidence": "Local type check passes."
+    },
+    {
+      "command": "uv run pytest -q",
+      "result": "pass",
+      "evidence": "Smoke and compliance tests pass."
+    }
+  ],
+  "verdict": "rework",
+  "ticket_transition": "IN_PROGRESS",
+  "follow_up_tickets": [
+    {
+      "task_type": "CHORE",
+      "task": "Configure protected branch required status checks",
+      "description": "Require `quality` and `workflow_compliance` checks before merge in GitHub settings.",
+      "status": "TODO"
+    }
+  ],
+  "next_cycle_focus": "Complete branch protection setup and verify CI-required checks policy end-to-end."
+}

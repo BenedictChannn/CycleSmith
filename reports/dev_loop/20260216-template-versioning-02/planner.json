@@ -1,0 +1,70 @@
+{
+  "cycle_id": "20260216-template-versioning-02",
+  "ticket": {
+    "type": "FEATURE",
+    "title": "Add template version metadata and upgrade status command",
+    "status_before": "IN_PROGRESS"
+  },
+  "objective": "Add template version metadata and expose a CLI status command for safer multi-repo upgrades.",
+  "scope_in": [
+    "src/cyclesmith/template_version.py",
+    "src/cyclesmith/init_project.py",
+    "src/cyclesmith/cli.py",
+    "tests/test_template_version.py",
+    "tests/test_init_project.py",
+    "docs/template_versioning.md",
+    "docs/plans/phase3_plan.md"
+  ],
+  "scope_out": [
+    "GitHub issue sync adapter",
+    "branch and PR automation helpers",
+    "campaign-scale pause/resume orchestration"
+  ],
+  "steps": [
+    {
+      "id": "S1",
+      "action": "Implement template metadata model and upgrade status evaluation logic.",
+      "files": [
+        "src/cyclesmith/template_version.py"
+      ],
+      "validation": [
+        "uv run pytest -q tests/test_template_version.py"
+      ]
+    },
+    {
+      "id": "S2",
+      "action": "Wire metadata writes into init flow and add template-status CLI command.",
+      "files": [
+        "src/cyclesmith/init_project.py",
+        "src/cyclesmith/cli.py"
+      ],
+      "validation": [
+        "uv run pytest -q tests/test_init_project.py"
+      ]
+    },
+    {
+      "id": "S3",
+      "action": "Document upgrade workflow and phase 3 adoption plan.",
+      "files": [
+        "docs/template_versioning.md",
+        "docs/contributor_runbook.md",
+        "docs/roadmap.md",
+        "docs/plans/phase3_plan.md",
+        "README.md",
+        "START_HERE.md"
+      ],
+      "validation": [
+        "manual docs review"
+      ]
+    }
+  ],
+  "risks": [
+    "Partial init runs may be misread as fully upgraded without explicit status messaging.",
+    "Version ordering can be ambiguous if non-numeric template version strings are introduced."
+  ],
+  "handoff_constraints": [
+    "Do not use getattr/setattr/hasattr.",
+    "Keep metadata schema strict and deterministic."
+  ],
+  "next_role": "WORKER"
+}

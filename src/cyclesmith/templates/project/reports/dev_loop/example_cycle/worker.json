@@ -1,0 +1,53 @@
+{
+  "cycle_id": "example-cycle",
+  "ticket_title": "Example in-progress ticket",
+  "step_results": [
+    {
+      "step_id": "S1",
+      "status": "done",
+      "notes": "Role contracts and artifact contract docs were added and linked.",
+      "files_touched": [
+        "docs/autonomy-lite/role_planner.md",
+        "docs/autonomy-lite/role_worker.md",
+        "docs/autonomy-lite/role_judge.md",
+        "docs/autonomy-lite/artifact_contract.md"
+      ],
+      "commands_run": [
+        "manual contract review"
+      ]
+    },
+    {
+      "step_id": "S2",
+      "status": "done",
+      "notes": "Validator script enforces schema and cross-artifact invariants.",
+      "files_touched": [
+        "src/cyclesmith/dev_loop/validate_cycle_artifacts.py"
+      ],
+      "commands_run": [
+        "uv run ruff check .",
+        "uv run ty check ."
+      ]
+    },
+    {
+      "step_id": "S3",
+      "status": "done",
+      "notes": "Integration tests cover happy path and failure cases.",
+      "files_touched": [
+        "tests/test_validate_cycle_artifacts.py"
+      ],
+      "commands_run": [
+        "uv run pytest -q tests/test_validate_cycle_artifacts.py"
+      ]
+    }
+  ],
+  "checks": {
+    "ruff_check": "pass",
+    "ruff_format": "pass",
+    "ty_check": "pass",
+    "pytest": "pass",
+    "rust_checks": "pass"
+  },
+  "result_status": "implemented",
+  "blockers": [],
+  "next_role": "JUDGE"
+}

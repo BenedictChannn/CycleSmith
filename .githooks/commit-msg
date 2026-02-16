@@ -1,0 +1,11 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+msg_file="$1"
+tmp_file="$(mktemp)"
+
+# Strip Cursor co-author trailer from commit messages.
+awk '!/^Co-authored-by: Cursor <cursoragent@cursor\.com>$/' "$msg_file" > "$tmp_file"
+
+# Replace original message file atomically.
+mv "$tmp_file" "$msg_file"

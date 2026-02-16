@@ -1,0 +1,35 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://cyclesmith.dev/schemas/dev_loop/operator_feedback.schema.json",
+  "title": "Operator Feedback Contract",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "version",
+    "feedback_id",
+    "target_ticket",
+    "summary",
+    "required_planner_action"
+  ],
+  "properties": {
+    "version": {
+      "const": 1
+    },
+    "feedback_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "target_ticket": {
+      "type": "string",
+      "minLength": 1
+    },
+    "summary": {
+      "type": "string",
+      "minLength": 1
+    },
+    "required_planner_action": {
+      "type": "string",
+      "minLength": 1
+    }
+  }
+}

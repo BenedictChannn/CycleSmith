@@ -1,0 +1,7 @@
+{
+  "version": 1,
+  "feedback_id": "OFB-20260216-01",
+  "target_ticket": "*",
+  "summary": "Keep self-hosted cycle artifacts synchronized with docs and memory after each merge.",
+  "required_planner_action": "Include `operator_feedback_refs` in planner.json when this feedback is applied."
+}

@@ -1,0 +1,56 @@
+{
+  "cycle_id": "20260216-template-versioning-02",
+  "ticket_title": "Add template version metadata and upgrade status command",
+  "step_results": [
+    {
+      "step_id": "S1",
+      "status": "done",
+      "notes": "Added strict template metadata read/write helpers and upgrade status reporting states.",
+      "files_touched": [
+        "src/cyclesmith/template_version.py"
+      ],
+      "commands_run": [
+        "uv run pytest -q tests/test_template_version.py"
+      ]
+    },
+    {
+      "step_id": "S2",
+      "status": "done",
+      "notes": "Connected metadata writes to init and exposed `cyclesmith template-status` for humans and JSON automation.",
+      "files_touched": [
+        "src/cyclesmith/init_project.py",
+        "src/cyclesmith/cli.py",
+        "tests/test_init_project.py"
+      ],
+      "commands_run": [
+        "uv run pytest -q tests/test_init_project.py"
+      ]
+    },
+    {
+      "step_id": "S3",
+      "status": "done",
+      "notes": "Published template versioning and phase-3 adoption docs.",
+      "files_touched": [
+        "docs/template_versioning.md",
+        "docs/plans/phase3_plan.md",
+        "docs/contributor_runbook.md",
+        "README.md",
+        "START_HERE.md",
+        "docs/roadmap.md"
+      ],
+      "commands_run": [
+        "manual docs review"
+      ]
+    }
+  ],
+  "checks": {
+    "ruff_check": "pass",
+    "ruff_format": "pass",
+    "ty_check": "pass",
+    "pytest": "pass",
+    "rust_checks": "pass"
+  },
+  "result_status": "implemented",
+  "blockers": [],
+  "next_role": "JUDGE"
+}

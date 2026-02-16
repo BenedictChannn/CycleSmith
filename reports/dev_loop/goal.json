@@ -1,0 +1,16 @@
+{
+  "version": 1,
+  "goal_id": "cyclesmith-self-host-goal",
+  "objective": "Build CycleSmith with CycleSmith using strict runner/validator/memory workflow.",
+  "completion_mode": "target_tickets_closed",
+  "target_tickets": [
+    "Add CI workflow for lint, type, and smoke tests"
+  ],
+  "max_cycles": 20,
+  "prune_profile": "shared-branch",
+  "stop_conditions": [
+    "same ticket receives three consecutive rework verdicts",
+    "two consecutive cycles produce failing required checks",
+    "operator requests pause"
+  ]
+}

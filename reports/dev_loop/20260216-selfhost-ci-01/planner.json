@@ -1,0 +1,72 @@
+{
+  "cycle_id": "20260216-selfhost-ci-01",
+  "ticket": {
+    "type": "CHORE",
+    "title": "Add CI workflow for lint, type, and smoke tests",
+    "status_before": "IN_PROGRESS"
+  },
+  "objective": "Add hard CI gates and workflow compliance checks for CycleSmith self-hosting.",
+  "scope_in": [
+    ".github/workflows/ci.yml",
+    "scripts/check_workflow_compliance.py",
+    "src/cyclesmith/dev_loop/workflow_compliance.py",
+    "tests/test_workflow_compliance.py",
+    "docs/dev_loop.md"
+  ],
+  "scope_out": [
+    "operator_feedback.json ingestion",
+    "ticket backend abstraction",
+    "planner policy pack API changes"
+  ],
+  "steps": [
+    {
+      "id": "S1",
+      "action": "Add CI jobs for quality and workflow compliance checks.",
+      "files": [
+        ".github/workflows/ci.yml"
+      ],
+      "validation": [
+        "uv run ruff check .",
+        "uv run ty check .",
+        "uv run pytest -q"
+      ]
+    },
+    {
+      "id": "S2",
+      "action": "Implement workflow compliance checker script and module.",
+      "files": [
+        "scripts/check_workflow_compliance.py",
+        "src/cyclesmith/dev_loop/workflow_compliance.py"
+      ],
+      "validation": [
+        "uv run pytest -q tests/test_workflow_compliance.py"
+      ]
+    },
+    {
+      "id": "S3",
+      "action": "Document strict self-hosting runbook and add root runtime assets.",
+      "files": [
+        "docs/dev_loop.md",
+        "docs/runbook_quickstart.md",
+        "reports/dev_loop/goal.json",
+        "reports/dev_loop/memory_snapshot.json"
+      ],
+      "validation": [
+        "manual docs review",
+        "uv run cyclesmith memory -- --memory reports/dev_loop/memory_snapshot.json validate"
+      ]
+    }
+  ],
+  "risks": [
+    "False-positive compliance failures if changed-path classification is too strict.",
+    "CI diff-base edge cases for first push commits."
+  ],
+  "handoff_constraints": [
+    "Do not use getattr/setattr/hasattr.",
+    "Keep cycle IDs runner-compatible and immutable after commit."
+  ],
+  "operator_feedback_refs": [
+    "OFB-20260216-01"
+  ],
+  "next_role": "WORKER"
+}

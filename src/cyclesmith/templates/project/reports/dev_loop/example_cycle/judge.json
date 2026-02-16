@@ -1,0 +1,21 @@
+{
+  "cycle_id": "example-cycle",
+  "ticket_title": "Example in-progress ticket",
+  "findings": [],
+  "qa_verification": [
+    {
+      "command": "cyclesmith validate -- --cycle-dir reports/dev_loop/example_cycle --validate-schema",
+      "result": "pass",
+      "evidence": "artifact bundle validates successfully"
+    },
+    {
+      "command": "uv run pytest -q tests/test_validate_cycle_artifacts.py",
+      "result": "pass",
+      "evidence": "validator regression tests pass"
+    }
+  ],
+  "verdict": "pass",
+  "ticket_transition": "REVIEW",
+  "follow_up_tickets": [],
+  "next_cycle_focus": "Wire autonomy protocol checks into CI and runbook smoke checks."
+}

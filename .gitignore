@@ -1,0 +1,14 @@
+.venv/
+__pycache__/
+.pytest_cache/
+.pytest_tmp/
+.pytest_tmp*/
+pytest-cache-files-*/
+.ruff_cache/
+.coverage
+dist/
+build/
+*.egg-info/
+tmp_test_runtime/
+reports/dev_loop/runner_state.json
+reports/dev_loop/strict_report.json

@@ -1,0 +1,65 @@
+{
+  "cycle_id": "example-cycle",
+  "ticket": {
+    "type": "FEATURE",
+    "title": "Example in-progress ticket",
+    "status_before": "IN_PROGRESS"
+  },
+  "objective": "Demonstrate a valid planner artifact for autonomy-lite workflow setup.",
+  "scope_in": [
+    "docs/autonomy-lite/*",
+    "src/*",
+    "tests/*"
+  ],
+  "scope_out": [
+    "unrelated subsystems",
+    "build pipeline behavior",
+    "external service integration"
+  ],
+  "steps": [
+    {
+      "id": "S1",
+      "action": "Define strict role contracts and artifact schema.",
+      "files": [
+        "docs/autonomy-lite/role_planner.md",
+        "docs/autonomy-lite/role_worker.md",
+        "docs/autonomy-lite/role_judge.md",
+        "docs/autonomy-lite/artifact_contract.md"
+      ],
+      "validation": [
+        "manual contract review"
+      ]
+    },
+    {
+      "id": "S2",
+      "action": "Implement artifact validator script.",
+      "files": [
+        "src/cyclesmith/dev_loop/validate_cycle_artifacts.py"
+      ],
+      "validation": [
+        "uv run ruff check .",
+        "uv run ty check ."
+      ]
+    },
+    {
+      "id": "S3",
+      "action": "Add integration tests for valid and invalid cycle bundles.",
+      "files": [
+        "tests/test_validate_cycle_artifacts.py"
+      ],
+      "validation": [
+        "uv run pytest -q tests/test_validate_cycle_artifacts.py"
+      ]
+    }
+  ],
+  "risks": [
+    "Schema drift between docs and validator implementation.",
+    "False positives when ticket naming diverges from artifact title."
+  ],
+  "handoff_constraints": [
+    "Do not edit files outside planner scope without ticket updates.",
+    "Do not mark cycle pass if required checks are missing."
+  ],
+  "operator_feedback_refs": [],
+  "next_role": "WORKER"
+}

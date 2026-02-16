@@ -1,0 +1,12 @@
+{
+  "version": 1,
+  "synced_at": "2026-02-16T13:40:00Z",
+  "cycle_id": "20260216-template-versioning-02",
+  "ticket_title": "Add template version metadata and upgrade status command",
+  "verdict": "pass",
+  "ticket_transition": "REVIEW",
+  "follow_up_tickets_added": 0,
+  "memory_ingest": true,
+  "memory_prune_triggered": false,
+  "memory_prune_command": []
+}
